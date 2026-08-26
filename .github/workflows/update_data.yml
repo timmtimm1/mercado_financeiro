@@ -5,7 +5,16 @@ on:
     # 21:15 UTC = 18:15 horário de Brasília, depois do fechamento da B3 (18h),
     # de segunda a sexta (o mercado não abre no fim de semana)
     - cron: "15 21 * * 1-5"
-  workflow_dispatch: {} # permite rodar manualmente pela aba Actions
+  workflow_dispatch:
+    inputs:
+      tickers:
+        description: >
+          Papéis específicos, separados por espaço (ex: PETR4.SA VALE3.SA). Deixe em
+          branco pra rodar a lista completa do config/tickers.yaml (comportamento do
+          agendamento normal). Uma seleção avulsa não sobrescreve o dataset principal
+          do painel — grava em data/consulta_*.csv.
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -25,7 +34,11 @@ jobs:
 
       - name: Rodar pipeline
         working-directory: src
-        run: python pipeline.py
+        # TICKERS vem de env, nunca interpolado direto no script — evita injeção de
+        # comando a partir do input do workflow_dispatch.
+        env:
+          TICKERS: ${{ inputs.tickers }}
+        run: python pipeline.py $TICKERS
 
       - name: Commitar dados atualizados
         run: |

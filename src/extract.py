@@ -26,6 +26,23 @@ def load_tickers(config_path: str) -> list[TickerSpec]:
     ]
 
 
+def resolve_tickers(config_path: str, escolhidos: list[str] | None) -> list[TickerSpec]:
+    """Se `escolhidos` for None, retorna a lista completa do config (comportamento padrão,
+    usado no run agendado). Se vier uma lista, filtra pra só esses papéis — usando o setor
+    já cadastrado no config quando existir, ou "outros" pra um ticker novo/avulso."""
+    todos = load_tickers(config_path)
+    if not escolhidos:
+        return todos
+
+    escolhidos_norm = {t.upper() if t.upper().endswith(".SA") else t.upper() + ".SA" for t in escolhidos}
+    por_ticker = {spec.ticker: spec for spec in todos}
+
+    resultado = []
+    for ticker in escolhidos_norm:
+        resultado.append(por_ticker.get(ticker, TickerSpec(ticker=ticker, setor="outros")))
+    return resultado
+
+
 def extract_quotes(specs: list[TickerSpec], period: str = "1y") -> pd.DataFrame:
     """Histórico de preço de fechamento por ticker."""
     frames = []
