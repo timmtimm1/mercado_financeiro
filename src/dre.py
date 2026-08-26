@@ -88,9 +88,16 @@ def montar_dre(ticker: str, periodo: str = "anual") -> pd.DataFrame:
 
     resultado = pd.concat([dre, av], axis=1)
 
+    # linhas informativas (ex: LPA) usam as mesmas colunas de valor já filtradas — sem AV,
+    # dividir LPA pela receita não tem sentido econômico
+    periodos_validos = dre.columns  # já passou pelo dropna acima
     for nome_pt, nome_yahoo in LINHAS_INFORMATIVAS:
-        if nome_yahoo in income_stmt.index:
-            resultado.loc[nome_pt] = list(income_stmt.loc[nome_yahoo]) + [None] * len(av.columns)
+        if nome_yahoo not in income_stmt.index:
+            continue
+        serie = income_stmt.loc[nome_yahoo]
+        serie.index = [c.date() if hasattr(c, "date") else c for c in serie.index]
+        valores = [serie.get(p) for p in periodos_validos] + [None] * len(av.columns)
+        resultado.loc[nome_pt] = valores
 
     return resultado
 
