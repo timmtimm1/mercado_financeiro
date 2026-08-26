@@ -16,8 +16,9 @@ def transform_quotes(quotes: pd.DataFrame) -> pd.DataFrame:
 
 def transform_fundamentals(fundamentals: pd.DataFrame) -> pd.DataFrame:
     fundamentals = fundamentals.copy()
-    # yfinance retorna proporção (0.05); padroniza pra percentual (5.0) — mais direto no Power BI
-    for col in ("roe", "dividend_yield", "margem_liquida"):
+    # yfinance retorna roe/margem como proporção (0.05); padroniza pra percentual (5.0).
+    # dividend_yield já vem em percentual (2.26 = 2.26%) nesta versão da lib — não reescalar.
+    for col in ("roe", "margem_liquida"):
         fundamentals[col] = fundamentals[col] * 100
 
     # média setorial, pra comparação "ativo vs. setor" no painel
