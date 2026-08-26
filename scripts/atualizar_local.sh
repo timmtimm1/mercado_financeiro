@@ -20,7 +20,7 @@ cd "$PROJETO_DIR"
 # só atualiza o Postgres se o git pull realmente trouxe dado novo — não recarrega
 # o banco à toa se o Action ainda não rodou (ex: dia sem novidade)
 ANTES=$(git rev-parse HEAD)
-git pull --ff-only origin main
+git pull --ff-only
 DEPOIS=$(git rev-parse HEAD)
 
 if [ "$ANTES" = "$DEPOIS" ]; then
