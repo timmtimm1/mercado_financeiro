@@ -1,0 +1,34 @@
+# Tickers acompanhados pelo painel, agrupados por setor para o comparativo
+# setorial no dashboard. Sufixo .SA é exigido pelo yfinance para ativos da B3.
+
+bancos:
+  - ITUB4.SA   # Itaú Unibanco
+  - BBAS3.SA   # Banco do Brasil
+  - BBDC4.SA   # Bradesco
+  - SANB11.SA  # Santander Brasil
+
+varejo:
+  - MGLU3.SA   # Magazine Luiza
+  - LREN3.SA   # Lojas Renner
+  - ASAI3.SA   # Assaí
+  - RADL3.SA   # Raia Drogasil
+
+commodities:
+  - VALE3.SA   # Vale
+  - PETR4.SA   # Petrobras
+  - SUZB3.SA   # Suzano
+  - CSNA3.SA   # CSN
+
+utilities:
+  - CMIG4.SA   # Cemig
+  - TAEE11.SA  # Taesa
+  - SBSP3.SA   # Sabesp
+  - EQTL3.SA   # Equatorial
+
+industria:
+  - WEGE3.SA   # WEG
+  - GGBR4.SA   # Gerdau
+
+financeiro_diversificado:
+  - B3SA3.SA   # B3
+  - BPAC11.SA  # BTG Pactual
