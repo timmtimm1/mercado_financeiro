@@ -1,6 +1,14 @@
 name: Atualizar dados do painel B3
 
 on:
+  # Gatilho intencional, não um resíduo de teste: o GitHub só indexa/reconhece um
+  # workflow (pra aparecer em `gh workflow list`, no botão "Run workflow" da aba
+  # Actions, etc.) depois que um evento correspondente a um dos seus triggers
+  # realmente acontece. Um workflow só com schedule+workflow_dispatch pode nunca
+  # ser "descoberto" — schedule só é avaliado por um processo interno periódico, e
+  # workflow_dispatch exige que o workflow já esteja indexado pra poder ser
+  # disparado. Esse push, restrito ao próprio arquivo do workflow, garante que
+  # qualquer edição futura force esse (re)reconhecimento automaticamente.
   push:
     branches: [master]
     paths:

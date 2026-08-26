@@ -47,6 +47,21 @@ execuções fica visível na aba **Actions** do repositório.
 acesso ao seu Postgres — é por isso que a lista ativa vira um arquivo versionado
 (`config/tickers_ativos.txt`) em vez de uma consulta ao vivo no banco.
 
+**Status confirmado com um teste real de ponta a ponta em 2026-08-26**: GitHub Actions
+rodou os 151 tickers com sucesso e commitou os dados; o cron local detectou a
+mudança, puxou via `git pull` e recarregou o Postgres sozinho — as duas camadas de
+automação, testadas juntas, não só cada uma isoladamente.
+
+**Pegadinha real que vale registrar**: um workflow cujos únicos gatilhos são
+`schedule` e `workflow_dispatch` pode nunca ser indexado pelo GitHub (não aparece em
+`gh workflow list`, nem no botão "Run workflow" da aba Actions) — `schedule` só é
+avaliado por um processo interno periódico, e `workflow_dispatch` exige que o
+workflow já esteja indexado pra poder ser disparado, um catch-22. A correção foi
+adicionar um `push` restrito ao próprio arquivo do workflow (`paths:
+.github/workflows/update_data.yml`), que força esse primeiro reconhecimento sempre
+que o arquivo for editado — já está assim no `update_data.yml`, permanente, não é
+resíduo de teste.
+
 ## Universo B3 (Postgres como referência de verdade)
 
 ```bash
