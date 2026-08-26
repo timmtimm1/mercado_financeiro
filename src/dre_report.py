@@ -57,7 +57,9 @@ def renderizar(ticker: str, periodo: str = "anual") -> str:
             row.append(_fmt(tabela.loc[idx, col], eh_av, eh_eps and not eh_av))
         linhas_texto.append(row)
 
-    fig, ax = plt.subplots(figsize=(10, 0.55 * len(tabela.index) + 2))
+    maior_rotulo = max(len(str(i)) for i in tabela.index)
+    largura = maior_rotulo * 0.11 + len(tabela.columns) * 1.35
+    fig, ax = plt.subplots(figsize=(largura, 0.55 * len(tabela.index) + 2))
     ax.axis("off")
     col_labels = [str(c).replace(" 00:00:00", "") for c in tabela.columns]
     tab = ax.table(
@@ -69,6 +71,7 @@ def renderizar(ticker: str, periodo: str = "anual") -> str:
     )
     tab.auto_set_font_size(False)
     tab.set_fontsize(10)
+    tab.auto_set_column_width(col=list(range(-1, len(col_labels))))
     tab.scale(1, 1.8)
 
     for (row, col), cell in tab.get_celld().items():
