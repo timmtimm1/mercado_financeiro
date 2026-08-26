@@ -13,3 +13,6 @@ __pycache__/
 # volumes/estado do Docker (Postgres, Metabase — quando entrarem)
 docker/volumes/
 pgdata/
+
+# logs gerados localmente
+logs/
