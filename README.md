@@ -1,44 +1,85 @@
 # Painel de Investimentos B3
 
-Pipeline automatizada que coleta cotações e fundamentos de ~20 ações da B3 (bancos,
-varejo, commodities, utilities, indústria) e alimenta um painel de screening no
-Metabase — P/L, ROE, dividend yield e comparação setorial — além de ferramentas de
-análise fundamentalista por ativo (DRE, Análise Horizontal, ROI/RSPL) baseadas em
-*Estruturas e Análise de Balanços* (Assaf Neto).
+Pipeline automatizada que coleta cotações e fundamentos de **~150 ações líquidas da
+B3** (filtradas de um universo de referência de quase 1.000 tickers) e alimenta um
+painel de screening no Metabase — P/L, ROE, dividend yield e comparação setorial —
+além de ferramentas de análise fundamentalista por ativo (DRE, Análise Horizontal,
+ROI/RSPL) baseadas em *Estruturas e Análise de Balanços* (Assaf Neto).
 
 ## Como funciona
 
 ```
+src/fetch_universe.py  (roda esporádico — listagem muda pouco)
+   scrape fundamentus.com.br → ~994 tickers da B3 inteira
+        │
+        ├──► Postgres: tabela universo_b3 (referência completa)
+        │
+        └──► config/tickers_ativos.txt (filtrado por liquidez > R$5mi/dia,
+              ~150 tickers — versionado no git, é isso que a pipeline usa)
+
 GitHub Actions (agendado, dias úteis após o fechamento da B3)
         │
         ▼
-  src/pipeline.py
-   extract.py   → puxa cotação (1 ano) e fundamentos via yfinance
+  src/pipeline.py  (lê config/tickers_ativos.txt — não depende de Postgres)
+   extract.py   → yfinance: cotação (1 ano) + fundamentos, setor descoberto
+                  em tempo real (info['sector']), não uma classificação manual
    transform.py → normaliza e calcula desvio em relação à média do setor
         │
         ▼
   data/quotes_history.csv
-  data/fundamentals_latest.csv  (committados no repo, viram o histórico versionado)
+  data/fundamentals_latest.csv  (committados no repo — histórico versionado)
         │
         ▼
-  src/load_postgres.py  (rodado localmente)
+  scripts/atualizar_local.sh  (cron local — git pull + recarrega só se mudou)
+        │
+        ▼
+  src/load_postgres.py
         │
         ▼
   Postgres (Docker, local)  →  Metabase (Docker, local) → painel
 ```
 
 A automação roda de segunda a sexta, 18h15 (horário de Brasília) — depois do
-fechamento do pregão. O histórico de execuções fica visível na aba **Actions** do
-repositório. `load_postgres.py` é local porque o GitHub Actions não tem acesso ao seu
-Postgres — puxe os dados mais recentes (`git pull`) e rode o load quando quiser
-atualizar o painel.
+fechamento do pregão, com ~150 tickers, leva em torno de 5 minutos. O histórico de
+execuções fica visível na aba **Actions** do repositório.
 
-## Rodando localmente
+`load_postgres.py` e `fetch_universe.py` são locais porque o GitHub Actions não tem
+acesso ao seu Postgres — é por isso que a lista ativa vira um arquivo versionado
+(`config/tickers_ativos.txt`) em vez de uma consulta ao vivo no banco.
+
+## Universo B3 (Postgres como referência de verdade)
+
+```bash
+cd src && python fetch_universe.py
+```
+
+Baixa a listagem completa da B3 (fundamentus.com.br, ~994 tickers, todas as classes
+de ação) e grava em duas formas:
+
+- **`universo_b3`** (Postgres) — tabela de referência completa, com P/L, ROE,
+  liquidez, patrimônio líquido etc. de **todos** os tickers, líquidos ou não. É essa
+  tabela que dá substância real ao banco (não só os ~150 ativamente monitorados) —
+  útil pra consultas SQL exploratórias, tipo "quais small caps têm ROIC > 20% mas
+  liquidez baixa".
+- **`config/tickers_ativos.txt`** — só os tickers com liquidez em 2 meses > R$5
+  milhões/dia (~150), a lista que `pipeline.py` de fato usa pra puxar cotação e
+  fundamentos completos via yfinance.
+
+**Por que filtrar por liquidez**: a mediana de liquidez em 2 meses no universo
+inteiro é **zero** — mais da metade dos ~994 tickers praticamente não negocia. Rodar
+yfinance pra shell company sem liquidez não teria sentido nem seria seguro pra
+qualquer análise de investimento.
+
+Rode `fetch_universe.py` de novo se quiser mudar o corte de liquidez (edite
+`LIQUIDEZ_MINIMA_PADRAO` no topo do arquivo) ou só pra atualizar a listagem depois de
+IPOs/deslistagens.
+
+## Rodando a pipeline localmente
 
 ```bash
 pip install -r requirements.txt
 
-# lista completa do config/tickers.yaml (comportamento padrão)
+# lista ativa (config/tickers_ativos.txt, ~150 tickers) — comportamento padrão
 cd src && python pipeline.py
 
 # ou só os papéis que você quiser
@@ -46,12 +87,14 @@ python pipeline.py PETR4.SA VALE3.SA
 ```
 
 Uma seleção avulsa de papéis grava em `data/consulta_*.csv` — nunca sobrescreve o
-dataset principal usado pelo painel.
+dataset principal usado pelo painel. Se `config/tickers_ativos.txt` ainda não existir
+(nunca rodou `fetch_universe.py`), cai pro fallback `config/tickers.yaml` (lista
+curada manual de 20 tickers, mantida só como rede de segurança).
 
 ## Painel (Postgres + Metabase, via Docker)
 
-Requer Docker. Metabase não roda no Power BI Desktop nem no Tableau Desktop no
-Linux — por isso o painel usa Metabase (open source, self-hosted).
+Requer Docker. Power BI Desktop e Tableau Desktop não rodam no Linux — por isso o
+painel usa Metabase (open source, self-hosted).
 
 **1. Configurar credenciais locais** (nunca commitadas):
 
@@ -76,12 +119,23 @@ cd src && python load_postgres.py
 **4. Abrir o Metabase**: [http://localhost:3000](http://localhost:3000) — a primeira
 vez pede pra você criar uma conta local (interativo, não dá pra automatizar) e
 conectar um banco: escolha **PostgreSQL**, host `postgres`, porta `5432`, banco/usuário/
-senha os mesmos do seu `.env`. Depois disso as tabelas `quotes_history` e
-`fundamentals_latest` aparecem prontas pra montar os gráficos.
+senha os mesmos do seu `.env`. Depois disso as tabelas `quotes_history`,
+`fundamentals_latest` e `universo_b3` aparecem prontas pra montar os gráficos ou
+consultar via SQL nativo (New → SQL query — bom lugar pra CTEs e window functions).
 
-Pra atualizar o painel depois de uma nova execução da pipeline: `git pull` (traz os
-CSVs novos) → `python load_postgres.py` (recarrega o Postgres) → o Metabase já reflete
-os dados novos, sem precisar reconfigurar nada.
+**5. Automatizar a atualização local** (opcional, recomendado):
+
+```bash
+crontab -e
+# adiciona uma linha tipo:
+0 19 * * 1-5 /home/SEU_USUARIO/Projects/mercado_financeiro/scripts/atualizar_local.sh
+```
+
+Isso roda todo dia útil às 19h (depois do GitHub Actions, que roda 18h15) — puxa o
+repo e recarrega o Postgres só se algo realmente mudou. Log em
+`logs/atualizar_local.log`. **Não instalei isso automaticamente** — o script está
+pronto, mas alterar o crontab é uma configuração persistente do seu sistema, então
+fica por sua conta rodar o comando acima quando quiser ativar.
 
 ## Análise fundamentalista por ativo
 
@@ -97,18 +151,17 @@ função detecta e recusa em vez de forçar dados que não existem.
 
 ## Dados
 
-- **Fonte**: [yfinance](https://github.com/ranaroussi/yfinance) (Yahoo Finance, não
-  oficial). Cotação com atraso de mercado, não tempo real — padrão mesmo em
-  ferramentas pagas de varejo.
-- **`quotes_history.csv`**: fechamento diário e volume, 1 ano, por ticker.
+- **Fontes**: [yfinance](https://github.com/ranaroussi/yfinance) (cotação/fundamentos
+  por ticker, atraso de mercado — não tempo real, padrão mesmo em ferramentas pagas
+  de varejo) e [fundamentus.com.br](https://www.fundamentus.com.br) (listagem
+  completa da B3, pra descobrir o universo).
+- **`quotes_history.csv`**: fechamento diário e volume, 1 ano, ~150 tickers ativos.
 - **`fundamentals_latest.csv`**: snapshot atual de P/L, P/VP, ROE, dividend yield,
   margem líquida, dívida/patrimônio e market cap, com o desvio de cada ativo em
-  relação à média do seu setor.
-
-## Tickers acompanhados
-
-Configurados em `config/tickers.yaml`, agrupados por setor. Adicionar um ticker novo
-é só incluir a linha no YAML — a próxima execução completa da pipeline já pega.
+  relação à média do seu setor (setor descoberto via yfinance, não classificação
+  manual).
+- **`universo_b3`** (só Postgres, não vira CSV): referência completa dos ~994
+  tickers da B3, incluindo os ilíquidos — não faz parte do pipeline diário.
 
 ## Segurança
 
@@ -125,8 +178,8 @@ Configurados em `config/tickers.yaml`, agrupados por setor. Adicionar um ticker 
 
 ## Próximos passos possíveis
 
-- Rodar `load_postgres.py` automaticamente depois de um `git pull`, via hook ou cron
-  local (hoje é manual, de propósito).
+- Agendar `fetch_universe.py` também (ex: mensal, via outro workflow do GitHub
+  Actions) — hoje é manual, de propósito, já que listagem da B3 muda pouco.
 - Migrar `fundamentals_latest.csv` pra um histórico versionado no próprio Postgres
   (uma foto por dia, não só a mais recente) pra permitir análise de tendência de
   fundamentos ano a ano.
