@@ -1,6 +1,10 @@
 name: Atualizar dados do painel B3
 
 on:
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/update_data.yml
   schedule:
     # 21:15 UTC = 18:15 horário de Brasília, depois do fechamento da B3 (18h),
     # de segunda a sexta (o mercado não abre no fim de semana)
